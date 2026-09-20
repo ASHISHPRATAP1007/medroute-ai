@@ -24,11 +24,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    user_role = postgresql.ENUM("SUPER_ADMIN", "ADMIN", "MR", name="user_role")
-    user_status = postgresql.ENUM("PENDING", "APPROVED", "REJECTED", "SUSPENDED", "INACTIVE", name="user_status")
-    entity_status = postgresql.ENUM("ACTIVE", "INACTIVE", name="entity_status")
-    entity_source = postgresql.ENUM("ADMIN", "IMPORT", "EXTERNAL", name="entity_source")
-    territory_status = postgresql.ENUM("ACTIVE", "INACTIVE", name="territory_status")
+    user_role = postgresql.ENUM("SUPER_ADMIN", "ADMIN", "MR", name="user_role", create_type=False)
+    user_status = postgresql.ENUM("PENDING", "APPROVED", "REJECTED", "SUSPENDED", "INACTIVE", name="user_status", create_type=False)
+    entity_status = postgresql.ENUM("ACTIVE", "INACTIVE", name="entity_status", create_type=False)
+    entity_source = postgresql.ENUM("ADMIN", "IMPORT", "EXTERNAL", name="entity_source", create_type=False)
+    territory_status = postgresql.ENUM("ACTIVE", "INACTIVE", name="territory_status", create_type=False)
     audit_action = postgresql.ENUM(
         "USER_REGISTERED", "MR_APPROVED", "MR_REJECTED", "MR_SUSPENDED", "MR_ACTIVATED",
         "DOCTOR_CREATED", "DOCTOR_UPDATED", "DOCTOR_DEACTIVATED", "DOCTOR_ACTIVATED",
@@ -36,6 +36,7 @@ def upgrade() -> None:
         "STOCKIST_CREATED", "STOCKIST_UPDATED", "STOCKIST_DEACTIVATED",
         "TERRITORY_CREATED", "TERRITORY_UPDATED", "MR_ASSIGNED_TO_TERRITORY", "MR_REMOVED_FROM_TERRITORY",
         name="audit_action",
+        create_type=False,
     )
 
     bind = op.get_bind()
