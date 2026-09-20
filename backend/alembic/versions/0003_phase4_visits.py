@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    visit_status = postgresql.ENUM("PLANNED", "COMPLETED", "CANCELLED", "MISSED", name="visit_status")
+    visit_status = postgresql.ENUM("PLANNED", "COMPLETED", "CANCELLED", "MISSED", name="visit_status", create_type=False)
     visit_status.create(op.get_bind(), checkfirst=True)
 
     with op.get_context().autocommit_block():
