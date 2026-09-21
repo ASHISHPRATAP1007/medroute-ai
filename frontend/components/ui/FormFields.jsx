@@ -1,6 +1,7 @@
+import { forwardRef } from "react";
 import clsx from "clsx";
 
-export function Input({ label, error, id, className, ...props }) {
+export const Input = forwardRef(function Input({ label, error, id, className, ...props }, ref) {
   return (
     <div className="space-y-1.5">
       {label && (
@@ -10,6 +11,7 @@ export function Input({ label, error, id, className, ...props }) {
       )}
       <input
         id={id}
+        ref={ref}
         className={clsx("input-field", error && "border-danger-500 focus:border-danger-500 focus:ring-danger-100", className)}
         aria-invalid={!!error}
         aria-describedby={error ? `${id}-error` : undefined}
@@ -22,9 +24,9 @@ export function Input({ label, error, id, className, ...props }) {
       )}
     </div>
   );
-}
+});
 
-export function Select({ label, error, id, options = [], className, ...props }) {
+export const Select = forwardRef(function Select({ label, error, id, options = [], className, ...props }, ref) {
   return (
     <div className="space-y-1.5">
       {label && (
@@ -34,6 +36,7 @@ export function Select({ label, error, id, options = [], className, ...props }) 
       )}
       <select
         id={id}
+        ref={ref}
         className={clsx("input-field", error && "border-danger-500", className)}
         aria-invalid={!!error}
         {...props}
@@ -47,4 +50,4 @@ export function Select({ label, error, id, options = [], className, ...props }) 
       {error && <p className="text-xs text-danger-600">{error}</p>}
     </div>
   );
-}
+});
