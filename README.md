@@ -305,3 +305,32 @@ feature MRs need to trust, over an opaque black-box score.
 - Google Places sync (Phase 2) and the rule-based AI score (Phase 3) still don't talk to each
   other beyond the score reading cached Places data — there's no cross-entity intelligence
   (e.g. "doctors near your top-scored doctor").
+
+## 16. Doctor Discovery from Google Places + Map View (added post-launch)
+
+Two additions on top of Phase 2's enrichment sync:
+
+- **Free map view (no API key needed):** `/mr/doctors` and `/admin/doctors` now have a List/Map
+  toggle. The map uses **Leaflet + OpenStreetMap tiles** — free, no Google Maps key, no billing —
+  plotting every doctor that already has `latitude`/`longitude` on file. See
+  `frontend/features/doctors/DoctorsMap.jsx`.
+- **"Discover from Google" (real doctor data, needs your own API key):** `/admin/doctors/discover`
+  lets an admin search Google Places by specialization + area/city/state and import real,
+  verified doctors — replacing manually-entered or seed/demo rows. Two-step and explicit by
+  design: search returns candidates only, nothing is written to the DB until the admin clicks
+  "Import" on a specific one. Imported doctors get `source=EXTERNAL` and their Places rating/
+  reviews/hours are cached immediately (same `place_enrichments` table Phase 2 uses).
+  - **Requires** `GOOGLE_PLACES_ENABLED=true` and a real `GOOGLE_PLACES_API_KEY` (Places API +
+    Geocoding API enabled, billing account linked — Google's free tier covers normal usage) set
+    on the Render backend. Without it, the search endpoint returns a clear 503, never fake data.
+  - Backend: `app/services/discovery_service.py`, `app/api/v1/doctor_discovery.py`.
+  - **We do not scrape Google/social media directly** — this only ever calls the official,
+    ToS-compliant Google Places API. Scraping would violate platform terms and risks importing
+    unverified/stale data as if it were confirmed.
+- **Mobile bottom nav for MR:** a fixed bottom tab bar (Home/Doctors/AI Plan/Visits/Profile)
+  appears on phone-width screens, since MRs are primarily mobile per the original spec. See
+  `frontend/components/layout/MobileBottomNav.jsx`.
+
+### New dependency
+`frontend/package.json` now includes `leaflet` and `react-leaflet` — run `npm install` again
+after pulling this change.
