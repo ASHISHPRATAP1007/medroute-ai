@@ -30,6 +30,7 @@ class HttpxGooglePlacesService(GooglePlacesService):
     FIND_PLACE_URL = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
     DETAILS_URL = "https://maps.googleapis.com/maps/api/place/details/json"
     NEARBY_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+    TEXT_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/textsearch/json"
 
     def __init__(self, api_key: str, timeout_seconds: float = 8.0):
         if not api_key:
@@ -79,6 +80,26 @@ class HttpxGooglePlacesService(GooglePlacesService):
                 data = resp.json()
         except Exception as exc:
             raise GooglePlacesUnavailableError(f"Google Places nearby search failed: {exc}") from exc
+
+        if data.get("status") not in ("OK", "ZERO_RESULTS"):
+            raise GooglePlacesUnavailableError(f"Google Places returned status={data.get('status')}")
+        return data.get("results", [])
+
+    async def text_search(self, query: str) -> list[dict[str, Any]]:
+        """
+        Free-text discovery search, e.g. "cardiologist in Gomti Nagar, Lucknow".
+        Used by the doctor-discovery admin feature to find *new* real-world
+        doctors to import — distinct from find_place_id, which resolves a
+        single known doctor's address to a place_id for enrichment sync.
+        """
+        params = {"query": query, "type": "doctor", "key": self._api_key}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.get(self.TEXT_SEARCH_URL, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as exc:
+            raise GooglePlacesUnavailableError(f"Google Places text search failed: {exc}") from exc
 
         if data.get("status") not in ("OK", "ZERO_RESULTS"):
             raise GooglePlacesUnavailableError(f"Google Places returned status={data.get('status')}")
