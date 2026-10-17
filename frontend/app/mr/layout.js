@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, Stethoscope, Building2, Truck, Map, UserCircle, Sparkles, CalendarCheck, Route } from "lucide-react";
+import { LayoutDashboard, Stethoscope, Building2, Truck, Map, UserCircle, Sparkles, CalendarCheck, Route, Compass } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
@@ -11,16 +11,17 @@ import { useAuth } from "@/hooks/use-auth";
 const BOTTOM_NAV_ITEMS = [
   { href: "/mr/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/mr/doctors", label: "Doctors", icon: Stethoscope },
+  { href: "/mr/explore", label: "Explore", icon: Compass },
   { href: "/mr/ai/daily-plan", label: "AI Plan", icon: Sparkles },
-  // "Visits" stays highlighted on /mr/visits/route too.
+  // "Visits" stays highlighted on /mr/visits/route too. Profile is in the menu drawer.
   { href: "/mr/visits", label: "Visits", icon: CalendarCheck },
-  { href: "/mr/profile", label: "Profile", icon: UserCircle },
 ];
 
 const NAV_ITEMS = [
   { href: "/mr/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/mr/ai/daily-plan", label: "AI Daily Plan", icon: Sparkles },
   { href: "/mr/doctors", label: "Doctors", icon: Stethoscope },
+  { href: "/mr/explore", label: "Explore Any Area", icon: Compass },
   { href: "/mr/visits", label: "My Visits", icon: CalendarCheck },
   { href: "/mr/visits/route", label: "Daily Route", icon: Route },
   { href: "/mr/medical-shops", label: "Medical Shops", icon: Building2 },
