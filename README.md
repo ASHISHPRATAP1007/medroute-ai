@@ -404,3 +404,22 @@ Next.js bakes `NEXT_PUBLIC_*` into the bundle — e.g. a build argument / env va
 **Upgrading an existing deployment:** demo accounts created by the old image stay in the
 database. Log in with your new `INITIAL_ADMIN_*` admin and suspend or delete them (or change
 their passwords) — `Demo@1234` is public in this README.
+
+## 19. Explore any area (free — no API key)
+
+`/mr/explore` and `/admin/explore` let anyone search doctors & clinics, hospitals, medical
+stores or distributors around **any** place (typed area/city/pincode, or "Near me" GPS),
+not just the MR's territory.
+
+- Data: **OpenStreetMap** — Nominatim for the place name, Overpass for the listings
+  (`app/services/explore_service.py`, `GET /api/v1/explore/places`). Free, no key, no billing.
+- Each result shows distance, speciality, address, phone (tap to call), opening hours,
+  **Directions** and **Reviews on Google** links.
+- **"Full list with ratings on Google Maps"** opens the same search in Google Maps, which
+  shows every Google Business Profile with ratings and reviews. It's a plain link, so it is
+  free — no Places API call is made.
+- Fair use: results are cached (1 h search, 24 h geocoding), Nominatim is called at most once
+  a second, and the endpoint is rate-limited (`EXPLORE_RATE_LIMIT`, default 20/minute).
+  Set `OSM_CONTACT_EMAIL` so the public OSM services can identify the app.
+- OpenStreetMap has fewer listings than Google in some areas and no ratings — that's what
+  the Google Maps button is for.

@@ -73,6 +73,11 @@ class Settings(BaseSettings):
     # Load the public demo dataset (Demo@1234 accounts). Never in production.
     SEED_DEMO_DATA: bool = False
 
+    # --- Free Explore (OpenStreetMap) ---
+    # Sent in the User-Agent to Nominatim/Overpass, as their usage policy asks.
+    OSM_CONTACT_EMAIL: str = ""
+    EXPLORE_RATE_LIMIT: str = "20/minute"
+
     # --- Phase 2: Google Places ---
     GOOGLE_PLACES_API_KEY: str = ""
     GOOGLE_PLACES_ENABLED: bool = False

@@ -20,6 +20,7 @@ from app.api.v1 import (
     dashboard,
     doctor_discovery,
     doctors,
+    explore,
     health,
     medical_shops,
     notifications,
@@ -147,3 +148,4 @@ app.include_router(visits.router, prefix=settings.API_V1_PREFIX)
 app.include_router(analytics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(notifications.router, prefix=settings.API_V1_PREFIX)
 app.include_router(search.router, prefix=settings.API_V1_PREFIX)
+app.include_router(explore.router, prefix=settings.API_V1_PREFIX)

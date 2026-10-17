@@ -49,7 +49,7 @@ export default function MRDashboardPage() {
                 <Link href="/mr/doctors"><Button variant="secondary" className="w-full">Find Doctor</Button></Link>
                 <Link href="/mr/medical-shops"><Button variant="secondary" className="w-full">Find Medical Shop</Button></Link>
                 <Link href="/mr/stockists"><Button variant="secondary" className="w-full">Find Stockist</Button></Link>
-                <Link href="/mr/territories"><Button variant="secondary" className="w-full">Explore Territory</Button></Link>
+                <Link href="/mr/explore"><Button variant="secondary" className="w-full">Explore Any Area</Button></Link>
               </div>
             </Card>
 

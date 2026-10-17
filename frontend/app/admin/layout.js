@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import {
-  LayoutDashboard, Users, Stethoscope, Building2, Truck, Map, ScrollText, Settings, BarChart3, Globe,
+  LayoutDashboard, Users, Stethoscope, Building2, Truck, Map, ScrollText, Settings, BarChart3, Globe, Compass,
 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/admin/mrs", label: "MR Management", icon: Users },
   { href: "/admin/doctors", label: "Doctors", icon: Stethoscope },
   { href: "/admin/doctors/discover", label: "Discover (Google)", icon: Globe },
+  { href: "/admin/explore", label: "Explore Any Area", icon: Compass },
   { href: "/admin/medical-shops", label: "Medical Shops", icon: Building2 },
   { href: "/admin/stockists", label: "Stockists", icon: Truck },
   { href: "/admin/territories", label: "Territories", icon: Map },
