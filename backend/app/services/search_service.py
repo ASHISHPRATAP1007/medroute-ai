@@ -34,7 +34,7 @@ async def global_search(db: AsyncSession, user: User, term: str, limit: int) -> 
 
     def scoped(query, model):
         if restrict is not None:
-            query = query.where(model.area.in_(restrict), model.status == EntityStatus.ACTIVE)
+            query = query.where(doctor_service.area_matches(model.area, restrict), model.status == EntityStatus.ACTIVE)
         return query
 
     doctors_q = scoped(

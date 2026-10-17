@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import { useAuth } from "@/hooks/use-auth";
 import { getMRDashboard } from "@/services/dashboard-service";
 import { getDailyPlan } from "@/services/ai-service";
+import AreaDoctorsPanel from "@/features/doctors/AreaDoctorsPanel";
 
 export default function MRDashboardPage() {
   const { user } = useAuth();
@@ -77,6 +78,8 @@ export default function MRDashboardPage() {
               )}
             </Card>
           </div>
+
+          <AreaDoctorsPanel />
         </>
       )}
     </div>

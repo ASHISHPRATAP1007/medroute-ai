@@ -38,7 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.doctor import Doctor
 from app.models.directory_mixins import EntityStatus
 from app.models.place_enrichment import PlaceEnrichment
-from app.services.doctor_service import get_mr_authorized_area_names
+from app.services.doctor_service import area_matches, get_mr_authorized_area_names
 from app.services.future_interfaces import AIRecommendationService
 
 RECENCY_WINDOW_DAYS = 30
@@ -114,7 +114,7 @@ class RuleBasedAIRecommendationService(AIRecommendationService):
             return []
 
         result = await db.execute(
-            select(Doctor).where(Doctor.area.in_(authorized_areas), Doctor.status == EntityStatus.ACTIVE)
+            select(Doctor).where(area_matches(Doctor.area, authorized_areas), Doctor.status == EntityStatus.ACTIVE)
         )
         doctors = list(result.scalars().all())
         if not doctors:

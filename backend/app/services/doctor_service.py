@@ -14,6 +14,16 @@ from app.schemas.doctor import DoctorCreate, DoctorUpdate
 from app.services.audit_service import log_action
 
 
+def normalize_area(name: str | None) -> str:
+    """Area names are matched case- and whitespace-insensitively ("gomti nagar " == "Gomti Nagar")."""
+    return " ".join((name or "").split()).lower()
+
+
+def area_matches(column, normalized_names: list[str]):
+    """SQL condition: column's normalized value is one of the (already normalized) names."""
+    return func.lower(func.regexp_replace(func.trim(column), r"\s+", " ", "g")).in_(normalized_names)
+
+
 async def get_mr_authorized_area_names(db: AsyncSession, mr_id: uuid.UUID) -> list[str]:
     """
     Resolve which Area names an MR is authorized to see, via their
@@ -28,7 +38,8 @@ async def get_mr_authorized_area_names(db: AsyncSession, mr_id: uuid.UUID) -> li
         .where(TerritoryMR.mr_id == mr_id, Territory.status == "ACTIVE")
         .distinct()
     )
-    return [row[0] for row in result.all()]
+    # Normalized (lowercase, single-spaced) — compare with area_matches()/normalize_area().
+    return sorted({normalize_area(row[0]) for row in result.all()})
 
 
 async def list_doctors(
@@ -69,7 +80,7 @@ async def list_doctors(
     if restrict_to_areas is not None:
         if len(restrict_to_areas) == 0:
             return [], 0  # MR with no territory assignments sees nothing
-        conditions.append(Doctor.area.in_(restrict_to_areas))
+        conditions.append(area_matches(Doctor.area, restrict_to_areas))
 
     for cond in conditions:
         query = query.where(cond)
@@ -94,7 +105,7 @@ async def get_doctor(db: AsyncSession, doctor_id: uuid.UUID, restrict_to_areas: 
     doctor = result.scalar_one_or_none()
     if doctor is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found.")
-    if restrict_to_areas is not None and doctor.area not in restrict_to_areas:
+    if restrict_to_areas is not None and normalize_area(doctor.area) not in restrict_to_areas:
         # Same 404 as "not found" — do not leak existence of out-of-territory records.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found.")
     return doctor

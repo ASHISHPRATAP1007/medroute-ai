@@ -15,7 +15,7 @@ from app.models.territory_mr import TerritoryMR
 from app.models.user import User, UserRole, UserStatus
 from app.schemas.common import ApiResponse
 from app.schemas.mr import MRListItem
-from app.services.doctor_service import get_mr_authorized_area_names
+from app.services.doctor_service import area_matches, get_mr_authorized_area_names
 
 router = APIRouter(tags=["Dashboard"])
 
@@ -78,9 +78,9 @@ async def mr_dashboard(db: AsyncSession = Depends(get_db), mr: User = Depends(ge
     areas = await get_mr_authorized_area_names(db, mr.id)
 
     if areas:
-        doctors = await _count(db, Doctor, Doctor.area.in_(areas), Doctor.status == EntityStatus.ACTIVE)
-        shops = await _count(db, MedicalShop, MedicalShop.area.in_(areas), MedicalShop.status == EntityStatus.ACTIVE)
-        stockists = await _count(db, Stockist, Stockist.area.in_(areas), Stockist.status == EntityStatus.ACTIVE)
+        doctors = await _count(db, Doctor, area_matches(Doctor.area, areas), Doctor.status == EntityStatus.ACTIVE)
+        shops = await _count(db, MedicalShop, area_matches(MedicalShop.area, areas), MedicalShop.status == EntityStatus.ACTIVE)
+        stockists = await _count(db, Stockist, area_matches(Stockist.area, areas), Stockist.status == EntityStatus.ACTIVE)
     else:
         doctors = shops = stockists = 0
 

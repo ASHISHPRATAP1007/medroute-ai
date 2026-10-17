@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_log import AuditAction
 from app.models.directory_mixins import EntityStatus
 from app.services.audit_service import log_action
+from app.services.doctor_service import area_matches, normalize_area
 
 ModelT = TypeVar("ModelT")
 
@@ -48,7 +49,7 @@ async def list_entities(
     if restrict_to_areas is not None:
         if len(restrict_to_areas) == 0:
             return [], 0
-        conditions.append(model.area.in_(restrict_to_areas))
+        conditions.append(area_matches(model.area, restrict_to_areas))
 
     for cond in conditions:
         query = query.where(cond)
@@ -66,7 +67,7 @@ async def get_entity(db: AsyncSession, model: Type[ModelT], entity_id: uuid.UUID
     entity = result.scalar_one_or_none()
     if entity is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{entity_label} not found.")
-    if restrict_to_areas is not None and entity.area not in restrict_to_areas:
+    if restrict_to_areas is not None and normalize_area(entity.area) not in restrict_to_areas:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{entity_label} not found.")
     return entity
 

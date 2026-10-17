@@ -21,7 +21,7 @@ const STATUS_OPTIONS = [
 ];
 
 const ACTIONS = {
-  approve: { fn: approveMR, label: "approve", confirmLabel: "Approve", message: "This MR will gain access to the MR application." },
+  approve: { fn: approveMR, label: "approve", confirmLabel: "Approve", message: "This MR will gain access to the MR application and be assigned a territory for the city/area they registered with." },
   reject: { fn: rejectMR, label: "reject", confirmLabel: "Reject", message: "This MR will not be able to log in." },
   suspend: { fn: suspendMR, label: "suspend", confirmLabel: "Suspend", message: "This MR will immediately lose access." },
   activate: { fn: activateMR, label: "reactivate", confirmLabel: "Reactivate", message: "This MR will regain access." },
@@ -42,8 +42,9 @@ export default function AdminMRsPage() {
 
   const mutation = useMutation({
     mutationFn: ({ type, mr }) => ACTIONS[type].fn(mr.id),
-    onSuccess: (_, { type }) => {
-      showToast(`MR ${ACTIONS[type].label}d successfully.`, "success");
+    onSuccess: (res, { type }) => {
+      // Approval reports which territory was auto-assigned from the MR's registered area.
+      showToast(res?.message || `MR ${ACTIONS[type].label}d successfully.`, "success");
       queryClient.invalidateQueries({ queryKey: ["admin-mrs"] });
       setPendingAction(null);
     },
@@ -60,6 +61,7 @@ export default function AdminMRsPage() {
     { key: "email", header: "Email" },
     { key: "phone", header: "Phone" },
     { key: "employee_id", header: "Employee ID", render: (row) => row.mr_profile?.employee_id || "—" },
+    { key: "area", header: "Area", render: (row) => [row.mr_profile?.assigned_area, row.mr_profile?.city].filter(Boolean).join(", ") || "—" },
     { key: "status", header: "Status", render: (row) => <Badge status={row.status} /> },
   ];
 

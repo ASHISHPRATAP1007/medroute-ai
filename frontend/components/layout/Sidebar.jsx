@@ -37,7 +37,8 @@ export default function Sidebar({ items, open, onClose }) {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white sm:block">
+      {/* Sticky + own scroll: stays in place while long pages scroll. */}
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white sm:flex">
         <div className="flex items-center gap-2 px-5 py-5 font-head text-lg font-bold text-slate-900">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path d="M12 2L4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4z" fill="#2B3A67" />
@@ -52,7 +53,7 @@ export default function Sidebar({ items, open, onClose }) {
       {open && (
         <div className="fixed inset-0 z-40 sm:hidden">
           <div className="absolute inset-0 bg-slate-900/40" onClick={onClose} aria-hidden="true" />
-          <div className="absolute left-0 top-0 h-full w-72 bg-white shadow-lg">
+          <div className="absolute left-0 top-0 h-full w-72 max-w-[85vw] overflow-y-auto bg-white shadow-lg">
             <div className="flex items-center justify-between border-b border-slate-100 p-4">
               <span className="font-head font-semibold text-slate-900">Menu</span>
               <button onClick={onClose} aria-label="Close menu" className="rounded-lg p-1.5 hover:bg-slate-100">
