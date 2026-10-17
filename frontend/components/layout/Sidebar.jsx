@@ -11,7 +11,11 @@ export default function Sidebar({ items, open, onClose }) {
   const content = (
     <nav className="flex h-full flex-col gap-1 p-4">
       {items.map((item) => {
-        const active = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+        // Longest matching href wins, so /mr/visits/route highlights
+        // "Daily Route" only — not "My Visits" as well.
+        const matches = (href) => pathname === href || pathname?.startsWith(`${href}/`);
+        const best = items.filter((i) => matches(i.href)).sort((a, b) => b.href.length - a.href.length)[0];
+        const active = best?.href === item.href;
         return (
           <Link
             key={item.href}
@@ -22,7 +26,7 @@ export default function Sidebar({ items, open, onClose }) {
               active ? "bg-primary-50 text-primary-700 before:absolute before:-left-3 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-signal-500" : "text-slate-600 hover:bg-slate-100"
             )}
           >
-            <item.icon className="h-4.5 w-4.5" aria-hidden="true" />
+            <item.icon className="h-4.5 w-4.5 shrink-0" aria-hidden="true" />
             {item.label}
           </Link>
         );

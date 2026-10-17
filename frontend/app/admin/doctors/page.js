@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Plus, Download, Upload } from "lucide-react";
+import { Plus, Download, Upload, Globe, List, Map as MapIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Input, Select } from "@/components/ui/FormFields";
 import DataTable from "@/components/ui/DataTable";
@@ -11,6 +11,9 @@ import Pagination from "@/components/ui/Pagination";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import ViewToggle from "@/components/ui/ViewToggle";
+import DoctorsMap from "@/features/doctors/DoctorsMap";
+import { doctorsToMapPoints } from "@/features/doctors/map-points";
 import { useToast } from "@/components/ui/Toast";
 import { listDoctorsAdmin, listSpecializations, deactivateDoctor, activateDoctor } from "@/services/doctor-service";
 import { exportDoctorsCsv, importDoctorsCsv } from "@/services/bulk-service";
@@ -23,6 +26,8 @@ export default function AdminDoctorsPage() {
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
   const [pendingToggle, setPendingToggle] = useState(null);
+  const [view, setView] = useState("list");
+  const isMap = view === "map";
   const fileInputRef = useRef(null);
   const queryClient = useQueryClient();
   const { showToast } = useToast();
@@ -31,10 +36,10 @@ export default function AdminDoctorsPage() {
   const specializations = specData?.data || [];
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["admin-doctors", { search, specializationId, status, page, sortBy, sortOrder }],
+    queryKey: ["admin-doctors", { search, specializationId, status, page: isMap ? 1 : page, sortBy, sortOrder, isMap }],
     queryFn: () =>
       listDoctorsAdmin({
-        search, specialization_id: specializationId, status, page, page_size: 20,
+        search, specialization_id: specializationId, status, page: isMap ? 1 : page, page_size: isMap ? 100 : 20,
         sort_by: sortBy, sort_order: sortOrder,
       }),
   });
@@ -99,6 +104,7 @@ export default function AdminDoctorsPage() {
     { key: "area", header: "Area" },
     { key: "city", header: "City" },
     { key: "phone", header: "Phone" },
+    { key: "source", header: "Source", render: (row) => ({ EXTERNAL: "Google", IMPORT: "CSV" }[row.source] || "Manual") },
     { key: "status", header: "Status", render: (row) => <Badge status={row.status} /> },
   ];
 
@@ -118,6 +124,9 @@ export default function AdminDoctorsPage() {
               <Download className="h-4 w-4" aria-hidden="true" />
               Export CSV
             </Button>
+            <Link href="/admin/doctors/discover">
+              <Button variant="secondary"><Globe className="h-4 w-4" aria-hidden="true" />Discover from Google</Button>
+            </Link>
             <Link href="/admin/doctors/new">
               <Button><Plus className="h-4 w-4" aria-hidden="true" />Add Doctor</Button>
             </Link>
@@ -134,8 +143,22 @@ export default function AdminDoctorsPage() {
         <Select id="doctor-status" className="sm:max-w-[160px]" value={status}
           onChange={(e) => { setStatus(e.target.value); setPage(1); }}
           options={[{ value: "", label: "All Statuses" }, { value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }]} />
+        <div className="sm:ml-auto">
+          <ViewToggle
+            value={view}
+            onChange={setView}
+            label="Doctor view"
+            options={[{ value: "list", label: "List", icon: List }, { value: "map", label: "Map", icon: MapIcon }]}
+          />
+        </div>
       </div>
 
+      {isMap ? (
+        <DoctorsMap
+          points={doctorsToMapPoints(result?.items, { specializations, hrefFor: (d) => `/admin/doctors/${d.id}` })}
+          height="65vh"
+        />
+      ) : (
       <DataTable
         columns={columns}
         rows={result?.items}
@@ -160,8 +183,9 @@ export default function AdminDoctorsPage() {
           </div>
         )}
       />
+      )}
 
-      {result && <Pagination page={result.page} totalPages={result.total_pages} onPageChange={setPage} />}
+      {!isMap && result && <Pagination page={result.page} totalPages={result.total_pages} onPageChange={setPage} />}
 
       <ConfirmDialog
         open={!!pendingToggle}

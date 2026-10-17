@@ -22,9 +22,16 @@ export async function getUpcomingFollowUps() {
   return apiRequest("/visits/follow-ups");
 }
 
-export async function getDailyRoute(targetDate) {
-  const qs = targetDate ? `?target_date=${targetDate}` : "";
-  return apiRequest(`/visits/daily-route${qs}`);
+/** origin: optional { lat, lng } — the MR's current position, used as the route start. */
+export async function getDailyRoute(targetDate, origin) {
+  const query = new URLSearchParams();
+  if (targetDate) query.set("target_date", targetDate);
+  if (origin) {
+    query.set("start_lat", origin.lat);
+    query.set("start_lng", origin.lng);
+  }
+  const qs = query.toString();
+  return apiRequest(`/visits/daily-route${qs ? `?${qs}` : ""}`);
 }
 
 export async function getDoctorVisitHistory(doctorId) {

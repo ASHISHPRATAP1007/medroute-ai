@@ -11,6 +11,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { listMyVisits, updateVisit } from "@/services/visit-service";
+import { formatISODate, localISODate } from "@/lib/dates";
 
 const STATUS_OPTIONS = [
   { value: "", label: "All" },
@@ -45,7 +46,7 @@ function CompleteVisitForm({ visit, onDone }) {
   return (
     <form className="mt-3 space-y-3 border-t border-slate-100 pt-3" onSubmit={handleSubmit((v) => mutation.mutate(v))}>
       <Input label="Outcome / notes" id={`outcome-${visit.id}`} {...register("outcome")} />
-      <Input label="Follow-up date (optional)" id={`followup-${visit.id}`} type="date" {...register("follow_up_date")} />
+      <Input label="Follow-up date (optional)" id={`followup-${visit.id}`} type="date" min={localISODate()} {...register("follow_up_date")} />
       <div className="flex gap-2">
         <Button type="submit" className="!px-3 !py-1.5 text-xs" disabled={mutation.isPending}>
           {mutation.isPending ? "Saving…" : "Mark Completed"}
@@ -95,19 +96,35 @@ export default function MRVisitsPage() {
       <div className="space-y-3">
         {visits.map((visit) => (
           <Card key={visit.id}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">{visit.scheduled_date}</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                {visit.doctor ? (
+                  <Link href={`/mr/doctors/${visit.doctor.id}`} className="font-medium text-slate-900 hover:underline">
+                    {visit.doctor.full_name}
+                  </Link>
+                ) : (
+                  <p className="font-medium text-slate-900">Doctor</p>
+                )}
+                <p className="text-sm text-slate-500">
+                  {formatISODate(visit.scheduled_date)}
+                  {visit.doctor && [visit.doctor.area, visit.doctor.city].filter(Boolean).length > 0 && (
+                    <> · {[visit.doctor.area, visit.doctor.city].filter(Boolean).join(", ")}</>
+                  )}
+                </p>
                 {visit.outcome && <p className="mt-1 text-sm text-slate-700">{visit.outcome}</p>}
-                {visit.follow_up_date && <p className="mt-1 text-xs text-primary-600">Follow-up: {visit.follow_up_date}</p>}
+                {visit.follow_up_date && <p className="mt-1 text-xs text-primary-600">Follow-up: {formatISODate(visit.follow_up_date)}</p>}
               </div>
               <Badge status={visit.status} />
             </div>
 
-            {visit.status === "PLANNED" && expandedVisitId !== visit.id && (
+            {(visit.status === "PLANNED" || visit.status === "MISSED") && expandedVisitId !== visit.id && (
               <div className="mt-3 flex gap-2 border-t border-slate-100 pt-3">
-                <Button className="!px-3 !py-1.5 text-xs" onClick={() => setExpandedVisitId(visit.id)}>Mark Completed</Button>
-                <Button variant="danger" className="!px-3 !py-1.5 text-xs" onClick={() => cancelMutation.mutate(visit)}>Cancel</Button>
+                <Button className="!px-3 !py-1.5 text-xs" onClick={() => setExpandedVisitId(visit.id)}>
+                  {visit.status === "MISSED" ? "Log as Completed" : "Mark Completed"}
+                </Button>
+                {visit.status === "PLANNED" && (
+                  <Button variant="danger" className="!px-3 !py-1.5 text-xs" onClick={() => cancelMutation.mutate(visit)}>Cancel</Button>
+                )}
               </div>
             )}
             {expandedVisitId === visit.id && (

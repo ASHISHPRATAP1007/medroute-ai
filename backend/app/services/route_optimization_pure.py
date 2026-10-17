@@ -36,11 +36,22 @@ def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * R * math.asin(min(1, math.sqrt(a)))
 
 
-def nearest_neighbor_order(points: list[RoutePoint], start_id: str | None = None) -> list[str]:
+def nearest_neighbor_order(
+    points: list[RoutePoint],
+    start_id: str | None = None,
+    start_lat: float | None = None,
+    start_lng: float | None = None,
+) -> list[str]:
     """
     Returns point IDs ordered by a greedy nearest-neighbor walk.
     Points with no coordinates are excluded from the walk and appended
     at the end, in their original relative order.
+
+    Starting point, in priority order:
+      1. `start_id` if it is one of the locatable points;
+      2. the point nearest to (`start_lat`, `start_lng`) — e.g. the MR's
+         current GPS position;
+      3. the first locatable point in the given order.
     """
     locatable = [p for p in points if p.lat is not None and p.lng is not None]
     unlocatable_ids = [p.id for p in points if p.lat is None or p.lng is None]
@@ -52,6 +63,11 @@ def nearest_neighbor_order(points: list[RoutePoint], start_id: str | None = None
 
     if start_id and start_id in remaining:
         current = remaining.pop(start_id)
+    elif start_lat is not None and start_lng is not None:
+        first_id = min(
+            remaining, key=lambda pid: haversine_km(start_lat, start_lng, remaining[pid].lat, remaining[pid].lng)
+        )
+        current = remaining.pop(first_id)
     else:
         current = locatable[0]
         remaining.pop(current.id, None)
@@ -83,4 +99,9 @@ if __name__ == "__main__":
     assert order[-1] == "no_coords", "Points without coordinates must go last"
     assert set(order) == {p.id for p in lucknow_points}, "Route must include every point exactly once"
     assert len(order) == len(set(order)), "Route must not repeat a point"
+
+    # Starting from a GPS position near Aliganj must visit Aliganj first.
+    order2 = nearest_neighbor_order(lucknow_points, start_lat=26.8900, start_lng=80.9300)
+    print("Route from GPS start:", order2)
+    assert order2[0] == "aliganj", "GPS start must pick the nearest stop first"
     print("Self-check passed.")

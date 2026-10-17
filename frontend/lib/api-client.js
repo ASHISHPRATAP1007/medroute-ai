@@ -42,7 +42,22 @@ class ApiError extends Error {
   }
 }
 
-async function refreshAccessToken() {
+// Several queries can hit 401 at the same moment once the access token
+// expires. Refresh tokens are single-use (rotated server-side), so firing one
+// /auth/refresh per failed request would make every call after the first one
+// fail and log the user out. Share a single in-flight refresh instead.
+let refreshInFlight = null;
+
+function refreshAccessToken() {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefreshAccessToken().finally(() => {
+      refreshInFlight = null;
+    });
+  }
+  return refreshInFlight;
+}
+
+async function doRefreshAccessToken() {
   const refreshToken = getRefreshToken();
   if (!refreshToken) throw new ApiError("No refresh token available.", 401);
 

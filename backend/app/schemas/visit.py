@@ -40,3 +40,6 @@ class RouteStopOut(BaseModel):
     visit: VisitOut
     doctor: DoctorOut
     order: int
+    # Straight-line (haversine) distance from the previous stop — or from the
+    # start location for the first stop. None when either end has no coordinates.
+    distance_from_previous_km: float | None = None

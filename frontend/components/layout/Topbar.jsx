@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, LogOut, Menu, Search } from "lucide-react";
+import { Bell, LogOut, Menu } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import GlobalSearch from "@/components/layout/GlobalSearch";
 import { listNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead } from "@/services/notification-service";
 
 function NotificationsMenu() {
@@ -52,7 +53,7 @@ function NotificationsMenu() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+          <div className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
             <div className="flex items-center justify-between px-2 py-1">
               <span className="text-sm font-medium text-slate-900">Notifications</span>
               {unreadCount > 0 && (
@@ -99,14 +100,8 @@ export default function Topbar({ onMenuClick }) {
         <button onClick={onMenuClick} className="rounded-lg p-1.5 hover:bg-slate-100 sm:hidden" aria-label="Open menu">
           <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
-        <div className="hidden items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 sm:flex">
-          <Search className="h-4 w-4 text-slate-400" aria-hidden="true" />
-          <input
-            type="search"
-            placeholder="Search doctors, shops, stockists…"
-            className="w-64 border-none bg-transparent text-sm outline-none placeholder:text-slate-400"
-          />
-        </div>
+        <span className="font-head text-base font-bold text-slate-900 sm:hidden">MedRoute AI</span>
+        <GlobalSearch />
       </div>
 
       <div className="flex items-center gap-3">

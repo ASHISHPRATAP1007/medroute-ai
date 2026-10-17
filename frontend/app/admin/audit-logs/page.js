@@ -6,13 +6,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Input } from "@/components/ui/FormFields";
 import DataTable from "@/components/ui/DataTable";
 import Pagination from "@/components/ui/Pagination";
-import { apiRequest } from "@/lib/api-client";
-
-async function listAuditLogs(params) {
-  const query = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => { if (v) query.set(k, v); });
-  return apiRequest(`/admin/audit-logs?${query.toString()}`);
-}
+import { listAuditLogs } from "@/services/audit-service";
 
 export default function AdminAuditLogsPage() {
   const [action, setAction] = useState("");

@@ -43,9 +43,14 @@ module.exports = {
         },
         danger: {
           50: "#FBEBE9",
+          100: "#F5D2CE",
           500: "#C1483D",
+          600: "#A93E34",
           700: "#93342C",
         },
+      },
+      spacing: {
+        4.5: "1.125rem",
       },
       fontFamily: {
         head: ['"Libre Franklin"', "system-ui", "sans-serif"],

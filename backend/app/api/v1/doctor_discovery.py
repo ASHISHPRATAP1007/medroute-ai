@@ -13,14 +13,16 @@ router = APIRouter(prefix="/doctors/discovery", tags=["Doctor Discovery (Google 
 
 
 @router.post("/search", response_model=ApiResponse[list[DiscoveredDoctorOut]])
-async def search_doctors(payload: DiscoverDoctorsRequest, _admin: User = Depends(require_admin)):
+async def search_doctors(
+    payload: DiscoverDoctorsRequest, db: AsyncSession = Depends(get_db), _admin: User = Depends(require_admin)
+):
     """
     Real-world doctor search via Google Places — nothing is saved yet.
     Requires GOOGLE_PLACES_ENABLED=true and a valid GOOGLE_PLACES_API_KEY;
     returns 503 with a clear message otherwise.
     """
     candidates = await discovery_service.search_doctors(
-        payload.specialization_name, payload.area, payload.city, payload.state
+        db, payload.specialization_name, payload.area, payload.city, payload.state
     )
     return ApiResponse(data=[DiscoveredDoctorOut(**c) for c in candidates])
 

@@ -31,6 +31,7 @@ export default function AdminTerritoriesPage() {
   const areas = areasData?.data || [];
   const territories = territoriesData?.data || [];
   const approvedMRs = mrsData?.data?.items || [];
+  const mrName = (id) => approvedMRs.find((m) => m.id === id)?.full_name;
 
   const cityForm = useForm();
   const areaForm = useForm();
@@ -133,7 +134,7 @@ export default function AdminTerritoriesPage() {
                 <ul className="mt-3 divide-y divide-slate-100 border-t border-slate-100 pt-2">
                   {territory.mr_links.map((link) => (
                     <li key={link.id} className="flex items-center justify-between py-1.5 text-sm">
-                      <span className="text-slate-600">MR ID: {link.mr_id}</span>
+                      <span className="text-slate-600">{mrName(link.mr_id) || <span className="mono text-xs">MR {link.mr_id.slice(0, 8)}…</span>}</span>
                       <Button
                         variant="danger" className="!px-2 !py-1 text-xs"
                         onClick={() => removeMutation.mutate({ territoryId: territory.id, mrId: link.mr_id })}

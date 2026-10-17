@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 import pytest
 
 from app.core.security import create_access_token, hash_password
@@ -142,7 +144,13 @@ async def test_complete_visit_with_follow_up(client, db):
 
     resp = await client.put(
         f"/api/v1/visits/{visit_id}",
-        json={"status": "COMPLETED", "outcome": "Discussed new product line.", "follow_up_date": "2026-10-01"},
+        json={
+            "status": "COMPLETED",
+            "outcome": "Discussed new product line.",
+            # Relative to today — a hard-coded date silently stops being
+            # "upcoming" once the calendar passes it.
+            "follow_up_date": (date.today() + timedelta(days=10)).isoformat(),
+        },
         headers=_auth_header(mr),
     )
     assert resp.status_code == 200
@@ -176,3 +184,68 @@ async def test_daily_route_orders_by_distance(client, db):
     ordered_doctor_ids = [s["doctor"]["id"] for s in stops]
     # C (Delhi) must not be visited between A and B — it should end up last.
     assert ordered_doctor_ids[-1] == str(doctor_c.id)
+
+
+@pytest.mark.asyncio
+async def test_daily_route_from_gps_start_and_distances(client, db):
+    admin = await _make_admin(db)
+    mr = await _make_approved_mr(db)
+    doctor_a = await _make_territory_with_doctor(db, admin.id, mr.id, lat=26.8548, lng=81.0104, area_name="AreaA")
+    doctor_c = await _make_territory_with_doctor(db, admin.id, mr.id, lat=28.7041, lng=77.1025, area_name="AreaC")
+
+    for doctor in (doctor_a, doctor_c):
+        await client.post(
+            "/api/v1/visits", json={"doctor_id": str(doctor.id), "scheduled_date": "2026-09-22"},
+            headers=_auth_header(mr),
+        )
+
+    # MR is standing in Delhi -> the Delhi doctor must come first.
+    resp = await client.get(
+        "/api/v1/visits/daily-route?target_date=2026-09-22&start_lat=28.70&start_lng=77.10",
+        headers=_auth_header(mr),
+    )
+    assert resp.status_code == 200
+    stops = resp.json()["data"]
+    assert [s["doctor"]["id"] for s in stops] == [str(doctor_c.id), str(doctor_a.id)]
+    assert stops[0]["distance_from_previous_km"] < 1
+    # Delhi -> Lucknow is roughly 400-450 km as the crow flies.
+    assert 380 < stops[1]["distance_from_previous_km"] < 470
+
+
+@pytest.mark.asyncio
+async def test_visit_list_includes_doctor_details(client, db):
+    admin = await _make_admin(db)
+    mr = await _make_approved_mr(db)
+    doctor = await _make_territory_with_doctor(db, admin.id, mr.id, area_name="NamedArea")
+    await client.post(
+        "/api/v1/visits", json={"doctor_id": str(doctor.id), "scheduled_date": "2026-09-23"},
+        headers=_auth_header(mr),
+    )
+    resp = await client.get("/api/v1/visits", headers=_auth_header(mr))
+    assert resp.status_code == 200
+    visit = resp.json()["data"][0]
+    assert visit["doctor"]["full_name"] == "Dr. NamedArea"
+    assert visit["doctor_id"] == str(doctor.id)
+
+
+@pytest.mark.asyncio
+async def test_overdue_planned_visits_become_missed_and_can_still_be_completed(client, db):
+    admin = await _make_admin(db)
+    mr = await _make_approved_mr(db)
+    doctor = await _make_territory_with_doctor(db, admin.id, mr.id)
+    past = (date.today() - timedelta(days=3)).isoformat()
+    future = (date.today() + timedelta(days=3)).isoformat()
+    for d in (past, future):
+        await client.post("/api/v1/visits", json={"doctor_id": str(doctor.id), "scheduled_date": d}, headers=_auth_header(mr))
+
+    resp = await client.get("/api/v1/visits", headers=_auth_header(mr))
+    by_date = {v["scheduled_date"]: v for v in resp.json()["data"]}
+    assert by_date[past]["status"] == "MISSED"
+    assert by_date[future]["status"] == "PLANNED"
+
+    late = await client.put(
+        f"/api/v1/visits/{by_date[past]['id']}", json={"status": "COMPLETED", "outcome": "Logged late"},
+        headers=_auth_header(mr),
+    )
+    assert late.status_code == 200
+    assert late.json()["data"]["status"] == "COMPLETED"

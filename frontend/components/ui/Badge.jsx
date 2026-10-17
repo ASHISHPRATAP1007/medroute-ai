@@ -7,6 +7,11 @@ const STATUS_STYLES = {
   INACTIVE: "bg-slate-100 text-slate-600",
   REJECTED: "bg-danger-50 text-danger-700",
   SUSPENDED: "bg-danger-50 text-danger-700",
+  // Visit statuses
+  PLANNED: "bg-primary-50 text-primary-700",
+  COMPLETED: "bg-success-50 text-success-700",
+  CANCELLED: "bg-slate-100 text-slate-600",
+  MISSED: "bg-danger-50 text-danger-700",
 };
 
 export default function Badge({ status, children, className }) {

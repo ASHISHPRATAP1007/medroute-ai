@@ -12,11 +12,17 @@ const STYLES = {
   info: "border-primary-500/30 bg-primary-50 text-primary-700",
 };
 
+// crypto.randomUUID() only exists in secure contexts (HTTPS / localhost) —
+// it throws when the app is opened over plain http on a LAN IP, e.g. while
+// testing on a phone. A counter is all a toast id needs.
+let nextToastId = 0;
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
   const showToast = useCallback((message, type = "info") => {
-    const id = crypto.randomUUID();
+    nextToastId += 1;
+    const id = nextToastId;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -26,7 +32,8 @@ export function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2" aria-live="polite">
+      {/* On phones, sit above the MR bottom tab bar instead of covering it. */}
+      <div className="fixed inset-x-4 bottom-20 z-50 flex flex-col gap-2 sm:inset-x-auto sm:bottom-4 sm:right-4" aria-live="polite">
         {toasts.map(({ id, message, type }) => {
           const Icon = ICONS[type];
           return (
