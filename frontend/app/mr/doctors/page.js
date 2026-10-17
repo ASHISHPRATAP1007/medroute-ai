@@ -2,12 +2,15 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, List, Map as MapIcon } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Input, Select } from "@/components/ui/FormFields";
 import { EmptyState, ErrorState, SkeletonRows } from "@/components/ui/Feedback";
 import Pagination from "@/components/ui/Pagination";
+import ViewToggle from "@/components/ui/ViewToggle";
 import DoctorCard from "@/features/doctors/DoctorCard";
+import DoctorsMap from "@/features/doctors/DoctorsMap";
+import { doctorsToMapPoints, googleMapsUrl } from "@/features/doctors/map-points";
 import { listDoctorsForMR, listSpecializations } from "@/services/doctor-service";
 
 const SORT_OPTIONS = [
@@ -24,16 +27,20 @@ export default function MRDoctorsPage() {
   const [sortBy, setSortBy] = useState("name");
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [view, setView] = useState("list");
 
   const { data: specData } = useQuery({ queryKey: ["specializations"], queryFn: listSpecializations });
   const specializations = specData?.data || [];
 
+  const isMap = view === "map";
+  // The map shows every match on one screen (up to the API's 100-row page);
+  // the list stays paginated.
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["mr-doctors", { search, specializationId, city, area, sortBy, page }],
+    queryKey: ["mr-doctors", { search, specializationId, city, area, sortBy, page: isMap ? 1 : page, isMap }],
     queryFn: () =>
       listDoctorsForMR({
         search, specialization_id: specializationId, city, area,
-        sort_by: sortBy, page, page_size: 12,
+        sort_by: sortBy, page: isMap ? 1 : page, page_size: isMap ? 100 : 12,
       }),
   });
 
@@ -52,7 +59,18 @@ export default function MRDoctorsPage() {
 
   return (
     <div>
-      <PageHeader title="Find a Doctor" description="Search doctors within your assigned territory." />
+      <PageHeader
+        title="Find a Doctor"
+        description="Search doctors within your assigned territory."
+        actions={
+          <ViewToggle
+            value={view}
+            onChange={setView}
+            label="Doctor view"
+            options={[{ value: "list", label: "List", icon: List }, { value: "map", label: "Map", icon: MapIcon }]}
+          />
+        }
+      />
 
       <div className="mb-4 flex flex-col gap-3">
         <div className="flex gap-2">
@@ -85,25 +103,26 @@ export default function MRDoctorsPage() {
         <EmptyState title="No doctors found in this area." description="Try adjusting your filters, or check with your admin about territory assignment." />
       )}
 
-      {result && result.items.length > 0 && (
+      {isMap && result && result.items.length > 0 && (
+        <DoctorsMap
+          points={doctorsToMapPoints(result.items, { specializations, hrefFor: (d) => `/mr/doctors/${d.id}` })}
+          height="60vh"
+        />
+      )}
+
+      {!isMap && result && result.items.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
           {result.items.map((doctor) => (
             <DoctorCard
               key={doctor.id}
               doctor={{ ...doctor, specialization_name: specializations.find((s) => s.id === doctor.specialization_id)?.name }}
-              mapUrl={
-                doctor.latitude && doctor.longitude
-                  ? `https://www.google.com/maps/search/?api=1&query=${doctor.latitude},${doctor.longitude}`
-                  : doctor.address
-                  ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(doctor.address)}`
-                  : undefined
-              }
+              mapUrl={googleMapsUrl(doctor)}
             />
           ))}
         </div>
       )}
 
-      {result && <Pagination page={result.page} totalPages={result.total_pages} onPageChange={setPage} />}
+      {!isMap && result && <Pagination page={result.page} totalPages={result.total_pages} onPageChange={setPage} />}
     </div>
   );
 }

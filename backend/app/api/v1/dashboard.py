@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_approved_mr, require_admin
@@ -58,7 +59,8 @@ async def admin_dashboard(db: AsyncSession = Depends(get_db), _admin: User = Dep
     territories = await _count(db, Territory)
 
     recent = await db.execute(
-        select(User).where(User.role == UserRole.MR, User.status == UserStatus.PENDING)
+        select(User).options(selectinload(User.mr_profile))
+        .where(User.role == UserRole.MR, User.status == UserStatus.PENDING)
         .order_by(User.created_at.desc()).limit(5)
     )
 

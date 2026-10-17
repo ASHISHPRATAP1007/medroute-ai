@@ -1,16 +1,20 @@
-# MedRoute AI — Phase 1
+# MedRoute AI
 
 "Find the Right Doctor. Plan the Right Visit."
 
 A field intelligence platform for Medical Representatives (MRs): doctor/medical-shop/stockist
-directories, admin approval workflow, and territory-based access control.
+directories, admin approval workflow, territory-based access control, Google Places discovery,
+AI-ranked daily plans, visit tracking with route optimization, and a free map view.
 
-> **Status: written, not yet run.** This code was generated in a sandboxed environment with
-> no network access and no PostgreSQL instance available, so it has **not** been installed,
-> started, or tested end-to-end. Every backend file passed a Python `py_compile` syntax check,
-> but that only proves the files parse — it does not prove the app runs. Follow the steps below
-> on your own machine and treat the first `alembic upgrade head` / `npm run dev` / `pytest` run
-> as the real first test. See **"Known limitations"** at the bottom before relying on this.
+> **Status: backend verified, frontend verified in a browser harness.**
+> - Backend: `alembic upgrade head` applied on PostgreSQL 16, the seed and bootstrap scripts
+>   run, and the **pytest suite passes (48 tests)**. The live API was exercised end-to-end.
+> - Frontend: every page was rendered in Chromium against the live API and the main flows
+>   were clicked through (login, maps, discovery, visit planning, route, global search,
+>   mobile bottom nav). That run used a React 19 + esbuild harness because `next` itself
+>   couldn't be downloaded in the build environment. **Run `npm install && npm run build`
+>   once on your machine** as the final check of the real Next.js build.
+> - Google Places was tested with recorded (mocked) Places API (New) responses, not a live key.
 
 ---
 
@@ -34,7 +38,7 @@ Frontend layering: `app/` (routes/pages) → `features` / `components` (UI) → 
 - **Frontend:** Next.js (App Router), React, JavaScript only (no TypeScript), Tailwind CSS,
   TanStack Query, React Hook Form + Zod, Lucide icons.
 - **Backend:** Python, FastAPI, SQLAlchemy 2.0 (async), PostgreSQL, Pydantic v2, Alembic,
-  python-jose (JWT), passlib/bcrypt, Uvicorn, pytest.
+  python-jose (JWT), bcrypt, Uvicorn, pytest.
 
 ## 3. Prerequisites
 
@@ -62,7 +66,7 @@ createdb medroute
 # Run migrations
 alembic upgrade head
 
-# Seed demo data
+# Seed demo data (development only — refuses to run with APP_ENV=production)
 python -m app.seed
 
 # Start the API
@@ -90,26 +94,26 @@ cp frontend/.env.example frontend/.env
 docker compose up --build
 ```
 
-This starts Postgres, runs `alembic upgrade head` automatically, then starts the backend and
-frontend. Run the seed script once the backend container is healthy:
-
-```bash
-docker compose exec backend python -m app.seed
-```
+This starts Postgres, runs `alembic upgrade head` and `python -m app.bootstrap` automatically
+(compose sets `SEED_DEMO_DATA=true`, so the demo accounts below are created), then starts the
+backend and frontend with hot reload (`frontend/Dockerfile.dev`).
 
 ## 7. Testing
 
 ```bash
 cd backend
-# Tests need a real Postgres database (Postgres-only types: UUID, ENUM, INET)
+# Tests need a real, throwaway Postgres database (Postgres-only types: UUID, ENUM, JSONB).
+# The tests create and drop all tables — never point this at real data.
+createdb medroute_test
 export DATABASE_URL=postgresql+asyncpg://user:pass@localhost/medroute_test
 export JWT_SECRET=test-secret
 pytest
 ```
 
-**Not yet run in this environment** (no Postgres available). Written tests cover: registration,
-login, pending/suspended access rules, refresh-token rotation, MR approval/authorization,
-admin-vs-MR access boundaries.
+48 tests, all passing: auth and token rotation, MR approval, territory isolation, AI ranking,
+visits (duplicates, ownership, missed visits, GPS-start routes), Google discovery
+(Places API (New), mocked), global search, analytics, CSV import/export, notifications,
+dashboards, the first-run bootstrap, and CORS headers on 500s.
 
 ## 8. Authentication & roles
 
@@ -135,7 +139,9 @@ params, since the restriction is applied regardless of what the client sends.
 | MR (pending) | `mr3.pending@medroute.dev` | `Demo@1234` |
 | MR (suspended) | `mr5.suspended@medroute.dev` | `Demo@1234` |
 
-Never use these values in a production deployment.
+These only exist when the demo data is loaded (`python -m app.seed`, or `SEED_DEMO_DATA=true`
+outside production). In production, create your first admin with `INITIAL_ADMIN_EMAIL` /
+`INITIAL_ADMIN_PASSWORD` (see "Deploying" below) — never use these demo values.
 
 ## 10. What's implemented
 
@@ -153,28 +159,20 @@ Never use these values in a production deployment.
   `app/services/future_interfaces.py` (`GooglePlacesService`, `AIRecommendationService`,
   `RouteOptimizationService`, `VisitService`, `NotificationService`).
 
-## 11. Known limitations (read before relying on this)
+## 11. Known limitations
 
-1. **Never executed.** No `pip install`, `npm install`, `alembic upgrade head`, `pytest`, or
-   `npm run build` has been run against this code in the environment that produced it (no
-   network access, no PostgreSQL). Expect to fix minor issues on first run — dependency version
-   pins may need adjusting, and the hand-written Alembic migration (`0001_initial.py`) was
-   written to mirror the SQLAlchemy models exactly but was never applied to a real database.
-2. **Refresh-token lookup is O(n).** `rotate_refresh_token` in `auth_service.py` scans all
-   non-revoked refresh tokens and bcrypt-verifies each one, since tokens are stored hashed and
-   can't be looked up by equality. Fine for demo data volumes; before production scale, either
-   index on a partial token prefix or store refresh tokens as a fast HMAC instead of bcrypt.
-3. **Rate limiting is process-local** (slowapi, in-memory). Fine for a single instance; won't
-   work correctly across multiple backend replicas without a shared store (e.g. Redis).
-4. **Frontend route guards are UX only,** as required by the spec — real enforcement is the
-   backend dependency layer. This is by design, not an oversight.
-5. **No image/file upload** for doctor photos etc. — out of scope for Phase 1 per spec.
-6. **Global search (spec §30)** is a static input in the topbar with no backend wiring yet —
-   the grouped-results search endpoint itself was not built out in this pass.
-7. **Frontend was not lint/build-checked** the way the backend was syntax-checked, because
-   `npm install` requires network access unavailable in this environment.
+1. **Rate limiting is process-local** (slowapi, in-memory). Fine for one backend instance; with
+   several replicas use a shared store (e.g. Redis).
+2. **Frontend route guards are UX only** by design — real enforcement is the backend
+   dependency layer.
+3. **No image/file upload** for doctor photos etc.
+4. **Notifications are in-app only** — email/SMS/push need a provider and credentials.
+5. **Route distances are straight-line** (haversine). "Navigate in Google Maps" opens real
+   turn-by-turn directions with traffic — free, no API key.
+6. **Map tiles come from the public OpenStreetMap servers.** Fine for normal use; for heavy
+   traffic switch `TILE_URL` in `features/doctors/DoctorsMap.jsx` to a hosted tile provider.
 
-## 12. Phase 2 — Google Places integration (implemented, unverified against live Google API)
+## 12. Phase 2 — Google Places integration (Places API (New); tested with mocked responses)
 
 Built on top of Phase 1 without modifying any Phase 1 table:
 
@@ -183,7 +181,8 @@ Built on top of Phase 1 without modifying any Phase 1 table:
   Doctor/MedicalShop/Stockist without three near-identical tables. Migration:
   `alembic/versions/0002_phase2_google_places.py`.
 - **Concrete service:** `app/services/google_places_service.py` (`HttpxGooglePlacesService`) —
-  calls Google's Find Place / Place Details endpoints. Implements the `GooglePlacesService`
+  calls **Places API (New)** (`places:searchText`, `places/{id}`) and normalizes the
+  responses to the legacy field names the rest of the app uses. Implements the `GooglePlacesService`
   abstract contract that Phase 1 defined in `app/services/future_interfaces.py`.
 - **Orchestration:** `app/services/external_data_service.py` — reads always hit our cache, never
   Google; writes only happen via an explicit admin action (`POST /doctors/{id}/sync-external`),
@@ -197,12 +196,11 @@ Built on top of Phase 1 without modifying any Phase 1 table:
 - **Config:** `GOOGLE_PLACES_ENABLED` and `GOOGLE_PLACES_API_KEY` in `backend/.env`. With
   `GOOGLE_PLACES_ENABLED=false` (the default), sync returns a clear `503` rather than pretending
   to work.
-- **Tests:** `tests/test_external_data.py` — all Google calls are mocked (`unittest.mock.patch`
-  on `HttpxGooglePlacesService`), since there's no network access in this environment to hit the
-  real API. **The `HttpxGooglePlacesService` HTTP calls themselves have never been exercised
-  against real Google endpoints** — verify request/response field names against
-  [Google's current Places API docs](https://developers.google.com/maps/documentation/places/web-service)
-  before relying on this in production; Google does change API versions and field names.
+- **Tests:** `tests/test_external_data.py` (sync, service methods mocked) and
+  `tests/test_discovery.py` (search/import, HTTP layer mocked with Places API (New)-shaped
+  payloads — so request URLs, headers, field masks and response parsing are covered).
+  The first call with a real key is the final check; if Google rejects it, the admin sees
+  Google's own error message.
 
 ## 13. Phase 3 — AI recommendation engine (rule-based, no external AI API)
 
@@ -298,10 +296,9 @@ feature MRs need to trust, over an opaque black-box score.
 - `NotificationService`'s *external* channels (email/SMS/push) are not implemented — only
   in-app notifications. Wiring a real email provider needs credentials and network access this
   environment doesn't have.
-- No scheduled/background jobs exist anywhere in this codebase (e.g. auto-flagging `MISSED`
-  visits after their date passes, or a daily follow-up digest) — everything is computed on
-  request. Adding a scheduler (Celery, APScheduler, or a cron-triggered endpoint) is the natural
-  next step if this goes further.
+- No scheduler: past PLANNED visits are flagged MISSED lazily, whenever visits or analytics
+  are read. A daily follow-up digest would need a scheduler (APScheduler, or a cron job
+  calling an endpoint).
 - Google Places sync (Phase 2) and the rule-based AI score (Phase 3) still don't talk to each
   other beyond the score reading cached Places data — there's no cross-entity intelligence
   (e.g. "doctors near your top-scored doctor").
@@ -310,8 +307,8 @@ feature MRs need to trust, over an opaque black-box score.
 
 Two additions on top of Phase 2's enrichment sync:
 
-- **Free map view (no API key needed):** `/mr/doctors` and `/admin/doctors` now have a List/Map
-  toggle. The map uses **Leaflet + OpenStreetMap tiles** — free, no Google Maps key, no billing —
+- **Free map view (no API key needed):** `/mr/doctors`, `/admin/doctors`, the MR doctor
+  profile, the discovery results and the daily route all have maps. The map uses **Leaflet + OpenStreetMap tiles** — free, no Google Maps key, no billing —
   plotting every doctor that already has `latitude`/`longitude` on file. See
   `frontend/features/doctors/DoctorsMap.jsx`.
 - **"Discover from Google" (real doctor data, needs your own API key):** `/admin/doctors/discover`
@@ -320,9 +317,9 @@ Two additions on top of Phase 2's enrichment sync:
   design: search returns candidates only, nothing is written to the DB until the admin clicks
   "Import" on a specific one. Imported doctors get `source=EXTERNAL` and their Places rating/
   reviews/hours are cached immediately (same `place_enrichments` table Phase 2 uses).
-  - **Requires** `GOOGLE_PLACES_ENABLED=true` and a real `GOOGLE_PLACES_API_KEY` (Places API +
-    Geocoding API enabled, billing account linked — Google's free tier covers normal usage) set
-    on the Render backend. Without it, the search endpoint returns a clear 503, never fake data.
+  - **Requires** `GOOGLE_PLACES_ENABLED=true` and a real `GOOGLE_PLACES_API_KEY` with
+    **Places API (New)** enabled and a billing account linked. Without it, the search endpoint
+    returns a clear 503 and the page shows setup steps — never fake data.
   - Backend: `app/services/discovery_service.py`, `app/api/v1/doctor_discovery.py`.
   - **We do not scrape Google/social media directly** — this only ever calls the official,
     ToS-compliant Google Places API. Scraping would violate platform terms and risks importing
@@ -332,5 +329,78 @@ Two additions on top of Phase 2's enrichment sync:
   `frontend/components/layout/MobileBottomNav.jsx`.
 
 ### New dependency
-`frontend/package.json` now includes `leaflet` and `react-leaflet` — run `npm install` again
-after pulling this change.
+`frontend/package.json` now includes `leaflet` (used directly — no `react-leaflet`, so there
+are no React-version peer conflicts and nothing touches `window` during server rendering).
+Run `npm install` again after pulling this change.
+
+## 17. October 2026 hardening pass — what changed
+
+**Fixed bugs (each one now has a test):**
+- `GET /admin/dashboard` and `GET /territories/mine` returned 500 (`MissingGreenlet`: async
+  lazy-loading during serialization). Admin dashboard, MR Territories and MR Profile pages
+  were broken.
+- 500 responses carried no CORS headers, so browsers reported a misleading "blocked by CORS
+  policy". Errors are now caught inside the CORS middleware.
+- The doctor-discovery router was never registered — `/doctors/discovery/*` was a 404.
+- The Google client used the **legacy** Places API, which new Google Cloud projects can no
+  longer enable. It now uses **Places API (New)** and normalizes responses to the same shape,
+  so cached data and the UI are unchanged. An import makes 1 Google call instead of 2.
+  Duplicate imports return 409, an unknown specialization returns 404 instead of 500, and
+  Google's own error message (e.g. "API key not valid") is shown to the admin.
+- Planning the same doctor twice on one day returned 500 instead of 409.
+- Daily route started from an arbitrary stop (DB row order). It now starts from the first
+  planned visit, or from the MR's GPS position (`start_lat`/`start_lng`), and returns
+  per-stop distances.
+- Two access tokens minted in the same second were identical (added a `jti`).
+- `passlib` is unmaintained and breaks with bcrypt ≥ 4.1; replaced with direct `bcrypt`.
+  Existing password hashes keep working.
+- bcrypt ran on the event loop, freezing every other request during a login; it now runs in
+  a worker thread. Failed logins for unknown emails now take the same time as for real ones.
+- Refresh-token lookup was O(n) bcrypt checks; it's now an indexed HMAC-SHA256 lookup
+  (migration `0005` revokes old-format tokens, so users log in once more).
+- The frontend fired one `/auth/refresh` per failed request when the access token expired;
+  refresh tokens are single-use, so parallel requests logged the user out. Refresh is now
+  shared.
+- "Today" used the UTC date in the browser (wrong before 5:30 AM IST); dates are now local,
+  and the backend uses `APP_TIMEZONE` (default `Asia/Kolkata`).
+- Toasts crashed on plain-http LAN URLs (`crypto.randomUUID` needs a secure context).
+- The backend Docker image ran the demo seed on **every start, including production**,
+  creating `Demo@1234` super-admin accounts. Replaced by `python -m app.bootstrap` (see below).
+- Model/migration drift on `territory_mrs.assigned_at`; `alembic check` is now clean.
+
+**New features:**
+- Global search in the topbar (`GET /search`): doctors, shops, stockists, plus MRs for
+  admins; territory-restricted for MRs; mobile search panel.
+- `/admin/doctors/discover` page: search Google, see results on a map, import with one click.
+- Daily Route: "Start from my location", per-stop and total km, route on the map, and a
+  "Navigate in Google Maps" button with all stops as waypoints.
+- MR mobile bottom navigation; Leaflet maps on the doctor lists and the doctor profile.
+- Visit plan date picker on doctor cards; "Add to today" on the AI Daily Plan.
+- My Visits shows the doctor's name. Past PLANNED visits automatically become MISSED (so
+  analytics "missed" is real), and a missed visit can still be logged as completed.
+- Territories page shows MR names instead of raw IDs.
+- `DATABASE_URL` accepts `postgres://…?sslmode=require` URLs from Render/Neon/Supabase as-is.
+- With `APP_ENV=production` the app refuses to start with a weak or default `JWT_SECRET`.
+
+## 18. Deploying (e.g. Render)
+
+**Backend** (Docker, root directory `backend`): set these environment variables:
+
+| Variable | Value |
+|---|---|
+| `APP_ENV` | `production` |
+| `DATABASE_URL` | your Postgres URL (`postgres://…` from Render/Neon is fine as-is) |
+| `JWT_SECRET` | `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
+| `CORS_ORIGINS` | your frontend URL, e.g. `https://medroute-web.onrender.com` |
+| `INITIAL_ADMIN_EMAIL` / `INITIAL_ADMIN_PASSWORD` | your first super-admin login (created once) |
+| `GOOGLE_PLACES_ENABLED` / `GOOGLE_PLACES_API_KEY` | optional, for Discover from Google |
+
+On start the container runs migrations, then `app.bootstrap`, then uvicorn on `$PORT`.
+
+**Frontend** (Docker, root directory `frontend`): pass the API URL **at build time**, since
+Next.js bakes `NEXT_PUBLIC_*` into the bundle — e.g. a build argument / env var
+`NEXT_PUBLIC_API_URL=https://<your-backend>/api/v1`. The image runs `next start` on `$PORT`.
+
+**Upgrading an existing deployment:** demo accounts created by the old image stay in the
+database. Log in with your new `INITIAL_ADMIN_*` admin and suspend or delete them (or change
+their passwords) — `Demo@1234` is public in this README.

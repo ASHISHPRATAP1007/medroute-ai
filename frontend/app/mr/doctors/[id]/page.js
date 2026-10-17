@@ -11,6 +11,9 @@ import { getDoctor, listSpecializations } from "@/services/doctor-service";
 import { getDoctorExternalData } from "@/services/external-data-service";
 import { getOpportunityScore } from "@/services/ai-service";
 import { getDoctorVisitHistory } from "@/services/visit-service";
+import DoctorsMap from "@/features/doctors/DoctorsMap";
+import { googleMapsUrl } from "@/features/doctors/map-points";
+import { formatISODate } from "@/lib/dates";
 
 export default function MRDoctorProfilePage() {
   const { id } = useParams();
@@ -43,12 +46,8 @@ export default function MRDoctorProfilePage() {
   const upcomingFollowUp = visitHistory.find((v) => v.follow_up_date && new Date(v.follow_up_date) >= new Date(new Date().toDateString()));
   const specialization = (specData?.data || []).find((s) => s.id === doctor.specialization_id)?.name;
 
-  const mapUrl =
-    doctor.latitude && doctor.longitude
-      ? `https://www.google.com/maps/search/?api=1&query=${doctor.latitude},${doctor.longitude}`
-      : doctor.address
-      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(doctor.address)}`
-      : null;
+  const mapUrl = googleMapsUrl(doctor);
+  const hasCoords = doctor.latitude != null && doctor.longitude != null;
 
   return (
     <div className="max-w-3xl">
@@ -82,16 +81,19 @@ export default function MRDoctorProfilePage() {
           <p className="text-sm text-slate-700">{doctor.address}</p>
           <p className="text-sm text-slate-500">{[doctor.area, doctor.city, doctor.state, doctor.pincode].filter(Boolean).join(", ")}</p>
 
-          {(doctor.latitude && doctor.longitude) || doctor.address ? (
-            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
-              <p className="text-sm text-slate-500">Live embedded map is not enabled — add a Google Maps key to unlock it.</p>
-              {mapUrl && (
-                <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block">
-                  <Button variant="secondary">View Location</Button>
-                </a>
-              )}
+          {hasCoords && (
+            <div className="mt-4">
+              <DoctorsMap
+                height="240px"
+                points={[{ id: doctor.id, lat: doctor.latitude, lng: doctor.longitude, title: doctor.full_name, subtitle: doctor.clinic_name || doctor.address }]}
+              />
             </div>
-          ) : null}
+          )}
+          {mapUrl && (
+            <a href={mapUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block">
+              <Button variant="secondary"><MapPin className="h-4 w-4" aria-hidden="true" />Open in Google Maps</Button>
+            </a>
+          )}
         </Card>
 
         <Card className="sm:col-span-2">
@@ -175,7 +177,7 @@ export default function MRDoctorProfilePage() {
               {visitHistory.map((visit) => (
                 <li key={visit.id} className="border-b border-slate-100 pb-2 last:border-0 last:pb-0">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-700">{visit.scheduled_date}</span>
+                    <span className="text-slate-700">{formatISODate(visit.scheduled_date)}</span>
                     <Badge status={visit.status} />
                   </div>
                   {visit.outcome && <p className="mt-1 text-sm text-slate-500">{visit.outcome}</p>}
@@ -191,7 +193,7 @@ export default function MRDoctorProfilePage() {
           </h2>
           {upcomingFollowUp ? (
             <p className="text-sm text-slate-700">
-              Scheduled for <span className="font-medium">{upcomingFollowUp.follow_up_date}</span>
+              Scheduled for <span className="font-medium">{formatISODate(upcomingFollowUp.follow_up_date)}</span>
             </p>
           ) : (
             <p className="text-sm text-slate-500">No upcoming follow-up set for this doctor.</p>

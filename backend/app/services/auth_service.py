@@ -12,11 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import (
     create_access_token,
     generate_refresh_token_value,
-    hash_password,
+    hash_password_async,
     hash_refresh_token,
     refresh_token_expiry,
-    verify_password,
-    verify_refresh_token,
+    verify_password_constant_time,
 )
 from app.models.mr_profile import MRProfile
 from app.models.refresh_token import RefreshToken
@@ -40,7 +39,7 @@ async def register_mr(db: AsyncSession, payload: MRRegisterRequest) -> User:
         full_name=payload.full_name,
         email=payload.email,
         phone=payload.mobile_number,
-        password_hash=hash_password(payload.password),
+        password_hash=await hash_password_async(payload.password),
         role=UserRole.MR,
         status=UserStatus.PENDING,
     )
@@ -73,7 +72,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
     invalid_credentials = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password."
     )
-    if user is None or not verify_password(password, user.password_hash):
+    if not await verify_password_constant_time(password, user.password_hash if user else None):
         raise invalid_credentials
 
     if user.role == UserRole.MR:
@@ -124,15 +123,12 @@ async def rotate_refresh_token(db: AsyncSession, raw_refresh_token: str) -> tupl
     invalid = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired refresh token.")
 
     result = await db.execute(
-        select(RefreshToken).where(RefreshToken.revoked == False)  # noqa: E712
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hash_refresh_token(raw_refresh_token),
+            RefreshToken.revoked == False,  # noqa: E712
+        )
     )
-    candidates = result.scalars().all()
-
-    matched: RefreshToken | None = None
-    for candidate in candidates:
-        if verify_refresh_token(raw_refresh_token, candidate.token_hash):
-            matched = candidate
-            break
+    matched: RefreshToken | None = result.scalar_one_or_none()
 
     if matched is None:
         raise invalid
@@ -154,10 +150,14 @@ async def rotate_refresh_token(db: AsyncSession, raw_refresh_token: str) -> tupl
 
 async def revoke_all_refresh_tokens_for_raw(db: AsyncSession, raw_refresh_token: str) -> None:
     """Used on logout — revokes just the presented token."""
-    result = await db.execute(select(RefreshToken).where(RefreshToken.revoked == False))  # noqa: E712
-    for candidate in result.scalars().all():
-        if verify_refresh_token(raw_refresh_token, candidate.token_hash):
-            candidate.revoked = True
-            candidate.revoked_at = datetime.now(timezone.utc)
-            await db.commit()
-            return
+    result = await db.execute(
+        select(RefreshToken).where(
+            RefreshToken.token_hash == hash_refresh_token(raw_refresh_token),
+            RefreshToken.revoked == False,  # noqa: E712
+        )
+    )
+    token = result.scalar_one_or_none()
+    if token is not None:
+        token.revoked = True
+        token.revoked_at = datetime.now(timezone.utc)
+        await db.commit()

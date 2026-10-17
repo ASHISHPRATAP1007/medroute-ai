@@ -19,7 +19,14 @@ from app.services.route_optimization_pure import RoutePoint, nearest_neighbor_or
 
 
 class NearestNeighborRouteOptimizationService(RouteOptimizationService):
-    async def optimize_route(self, mr_id: str, doctor_ids: list[str], db: AsyncSession) -> list[str]:
+    async def optimize_route(
+        self,
+        mr_id: str,
+        doctor_ids: list[str],
+        db: AsyncSession,
+        start_lat: float | None = None,
+        start_lng: float | None = None,
+    ) -> list[str]:
         """
         Extended beyond the Phase 1 abstract signature to take a DB
         session — see ai_recommendation_service.py for the same
@@ -41,4 +48,4 @@ class NearestNeighborRouteOptimizationService(RouteOptimizationService):
             for doctor_id in doctor_ids
             if doctor_id in doctors_by_id
         ]
-        return nearest_neighbor_order(points)
+        return nearest_neighbor_order(points, start_lat=start_lat, start_lng=start_lng)

@@ -20,7 +20,7 @@ class RefreshToken(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    token_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

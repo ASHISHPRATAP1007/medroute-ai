@@ -4,13 +4,17 @@ Development seed script.
 Usage (after `alembic upgrade head`):
     python -m app.seed
 
-Creates clearly-fake demo data only. Never run this against production.
+Creates clearly-fake demo data only. Never run this against production:
+it refuses to run when APP_ENV=production unless you pass --force.
+Safe to run more than once — if the demo users already exist it only
+tops up specializations and exits.
 """
 import asyncio
-import uuid
+import sys
 
 from sqlalchemy import select
 
+from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.security import hash_password
 from app.models.area import Area
@@ -27,19 +31,25 @@ from app.models.user import User, UserRole, UserStatus
 DEMO_PASSWORD = "Demo@1234"  # development only — never use in production
 
 
+async def ensure_specializations(db) -> dict[str, Specialization]:
+    existing = set((await db.execute(select(Specialization.name))).scalars().all())
+    for name in DEFAULT_SPECIALIZATIONS:
+        if name not in existing:
+            db.add(Specialization(name=name))
+    await db.commit()
+    result = await db.execute(select(Specialization))
+    return {s.name: s for s in result.scalars().all()}
+
+
 async def seed():
     async with AsyncSessionLocal() as db:
         # ---------- Specializations ----------
-        existing = (await db.execute(select(Specialization.name))).scalars().all()
-        specs_by_name: dict[str, Specialization] = {}
-        for name in DEFAULT_SPECIALIZATIONS:
-            if name not in existing:
-                spec = Specialization(name=name)
-                db.add(spec)
-        await db.commit()
-        result = await db.execute(select(Specialization))
-        for s in result.scalars().all():
-            specs_by_name[s.name] = s
+        specs_by_name = await ensure_specializations(db)
+
+        already = await db.execute(select(User.id).where(User.email == "superadmin@medroute.dev"))
+        if already.scalar_one_or_none() is not None:
+            print("Demo data already present — skipping (specializations topped up).")
+            return
 
         # ---------- Cities / Areas / Territories ----------
         city = City(name="Lucknow", state="Uttar Pradesh", country="India")
@@ -151,4 +161,8 @@ async def seed():
 
 
 if __name__ == "__main__":
+    if get_settings().is_production and "--force" not in sys.argv:
+        print("Refusing to seed demo data with APP_ENV=production (demo accounts use a public password).")
+        print("Use `python -m app.bootstrap` with INITIAL_ADMIN_EMAIL/INITIAL_ADMIN_PASSWORD instead.")
+        sys.exit(1)
     asyncio.run(seed())

@@ -57,11 +57,18 @@ async def list_territories(db: AsyncSession = Depends(get_db), _admin: User = De
 async def list_my_territories(db: AsyncSession = Depends(get_db), mr: User = Depends(get_current_approved_mr)):
     """MR's own assigned territories, for their dashboard/profile."""
     from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
     from app.models.territory import Territory
     from app.models.territory_mr import TerritoryMR
 
+    # mr_links must be eager-loaded: AsyncSession can't lazy-load it during
+    # response serialization (that raised MissingGreenlet -> 500 before).
     result = await db.execute(
-        select(Territory).join(TerritoryMR, TerritoryMR.territory_id == Territory.id).where(TerritoryMR.mr_id == mr.id)
+        select(Territory)
+        .options(selectinload(Territory.mr_links))
+        .join(TerritoryMR, TerritoryMR.territory_id == Territory.id)
+        .where(TerritoryMR.mr_id == mr.id)
+        .order_by(Territory.name)
     )
     territories = list(result.scalars().all())
     return ApiResponse(data=[TerritoryOut.model_validate(t) for t in territories])

@@ -5,7 +5,17 @@ import { useRouter } from "next/navigation";
 import { LayoutDashboard, Stethoscope, Building2, Truck, Map, UserCircle, Sparkles, CalendarCheck, Route } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import { useAuth } from "@/hooks/use-auth";
+
+const BOTTOM_NAV_ITEMS = [
+  { href: "/mr/dashboard", label: "Home", icon: LayoutDashboard },
+  { href: "/mr/doctors", label: "Doctors", icon: Stethoscope },
+  { href: "/mr/ai/daily-plan", label: "AI Plan", icon: Sparkles },
+  // "Visits" stays highlighted on /mr/visits/route too.
+  { href: "/mr/visits", label: "Visits", icon: CalendarCheck },
+  { href: "/mr/profile", label: "Profile", icon: UserCircle },
+];
 
 const NAV_ITEMS = [
   { href: "/mr/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -41,8 +51,9 @@ export default function MRLayout({ children }) {
       <Sidebar items={NAV_ITEMS} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => setDrawerOpen(true)} />
-        <main className="flex-1 p-4 pb-20 sm:p-6 sm:pb-6">{children}</main>
+        <main className="flex-1 p-4 pb-24 sm:p-6 sm:pb-6">{children}</main>
       </div>
+      <MobileBottomNav items={BOTTOM_NAV_ITEMS} />
     </div>
   );
 }

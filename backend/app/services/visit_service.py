@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,25 @@ from app.services import doctor_service
 from app.services.audit_service import log_action
 
 
+async def mark_overdue_visits_missed(db: AsyncSession, today: date, mr_id: uuid.UUID | None = None) -> int:
+    """
+    PLANNED visits whose day has passed become MISSED. Run lazily before
+    reads that show statuses (visit lists, analytics) instead of needing a
+    scheduler. The MR can still mark a MISSED visit COMPLETED afterwards.
+    """
+    stmt = (
+        update(Visit)
+        .where(Visit.status == VisitStatus.PLANNED, Visit.scheduled_date < today)
+        .values(status=VisitStatus.MISSED)
+    )
+    if mr_id is not None:
+        stmt = stmt.where(Visit.mr_id == mr_id)
+    result = await db.execute(stmt)
+    if result.rowcount:
+        await db.commit()
+    return result.rowcount or 0
+
+
 async def _assert_doctor_in_mr_territory(db: AsyncSession, mr_id: uuid.UUID, doctor_id: uuid.UUID) -> Doctor:
     restrict = await doctor_service.get_mr_authorized_area_names(db, mr_id)
     return await doctor_service.get_doctor(db, doctor_id, restrict_to_areas=restrict)  # 404s if unauthorized
@@ -21,21 +40,34 @@ async def _assert_doctor_in_mr_territory(db: AsyncSession, mr_id: uuid.UUID, doc
 async def create_visit(db: AsyncSession, mr_id: uuid.UUID, payload) -> Visit:
     await _assert_doctor_in_mr_territory(db, mr_id, payload.doctor_id)
 
+    duplicate = HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="This doctor is already on your visit plan for that date.",
+    )
+    existing = await db.execute(
+        select(Visit.id).where(
+            Visit.mr_id == mr_id,
+            Visit.doctor_id == payload.doctor_id,
+            Visit.scheduled_date == payload.scheduled_date,
+        )
+    )
+    if existing.scalar_one_or_none() is not None:
+        raise duplicate
+
     visit = Visit(mr_id=mr_id, doctor_id=payload.doctor_id, scheduled_date=payload.scheduled_date)
     db.add(visit)
-    await db.flush()
-    await log_action(
-        db, user_id=mr_id, action=AuditAction.VISIT_PLANNED, entity_type="Visit", entity_id=visit.id,
-        description=f"Visit planned for doctor {payload.doctor_id} on {payload.scheduled_date}.",
-    )
     try:
+        # The unique constraint still guards the race where two requests
+        # pass the pre-check at once; the violation surfaces at flush.
+        await db.flush()
+        await log_action(
+            db, user_id=mr_id, action=AuditAction.VISIT_PLANNED, entity_type="Visit", entity_id=visit.id,
+            description=f"Visit planned for doctor {payload.doctor_id} on {payload.scheduled_date}.",
+        )
         await db.commit()
     except IntegrityError:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This doctor is already on your visit plan for that date.",
-        )
+        raise duplicate
     await db.refresh(visit)
     return visit
 
@@ -109,5 +141,8 @@ async def get_planned_visits_for_date(db: AsyncSession, mr_id: uuid.UUID, target
         select(Visit).where(
             Visit.mr_id == mr_id, Visit.scheduled_date == target_date, Visit.status == VisitStatus.PLANNED
         )
+        # Order the MR added them in — the first one planned is the default
+        # starting point of the route when no start location is given.
+        .order_by(Visit.created_at.asc(), Visit.id.asc())
     )
     return list(result.scalars().all())

@@ -1,21 +1,28 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Phone, Stethoscope, CalendarPlus } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { planVisit } from "@/services/visit-service";
+import { formatISODate, localISODate } from "@/lib/dates";
 
 export default function DoctorCard({ doctor, mapUrl }) {
   const initial = doctor.full_name?.trim()?.[0]?.toUpperCase() || "D";
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const today = localISODate();
+  const [planDate, setPlanDate] = useState(today);
 
   const addToPlanMutation = useMutation({
-    mutationFn: () => planVisit(doctor.id, new Date().toISOString().slice(0, 10)),
+    mutationFn: () => planVisit(doctor.id, planDate),
     onSuccess: () => {
-      showToast(`${doctor.full_name} added to today's visit plan.`, "success");
+      showToast(
+        `${doctor.full_name} added to your plan for ${planDate === today ? "today" : formatISODate(planDate)}.`,
+        "success"
+      );
       queryClient.invalidateQueries({ queryKey: ["my-visits"] });
       queryClient.invalidateQueries({ queryKey: ["daily-route"] });
     },
@@ -51,7 +58,7 @@ export default function DoctorCard({ doctor, mapUrl }) {
         </div>
       </div>
 
-      <div className="flex gap-2 sm:flex-col">
+      <div className="flex flex-wrap gap-2 sm:w-44 sm:flex-col sm:flex-nowrap">
         <Link href={`/mr/doctors/${doctor.id}`} className="flex-1 sm:flex-none">
           <Button className="w-full">View Profile</Button>
         </Link>
@@ -62,15 +69,25 @@ export default function DoctorCard({ doctor, mapUrl }) {
             </Button>
           </a>
         )}
-        <Button
-          variant="secondary"
-          className="w-full"
-          onClick={() => addToPlanMutation.mutate()}
-          disabled={addToPlanMutation.isPending}
-        >
-          <CalendarPlus className="h-4 w-4" aria-hidden="true" />
-          {addToPlanMutation.isPending ? "Adding…" : "Add to Visit Plan"}
-        </Button>
+        <div className="flex w-full gap-1.5 sm:flex-col">
+          <input
+            type="date"
+            value={planDate}
+            min={today}
+            onChange={(e) => setPlanDate(e.target.value || today)}
+            aria-label={`Visit date for ${doctor.full_name}`}
+            className="input-field !w-auto flex-1 !py-2 text-xs sm:!w-full"
+          />
+          <Button
+            variant="secondary"
+            className="flex-1 sm:w-full"
+            onClick={() => addToPlanMutation.mutate()}
+            disabled={addToPlanMutation.isPending}
+          >
+            <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+            {addToPlanMutation.isPending ? "Adding…" : "Add to Plan"}
+          </Button>
+        </div>
       </div>
     </div>
   );

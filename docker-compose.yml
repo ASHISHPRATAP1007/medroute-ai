@@ -24,6 +24,8 @@ services:
       - ./backend/.env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-medroute}:${POSTGRES_PASSWORD:-medroute}@postgres:5432/${POSTGRES_DB:-medroute}
+      # Local dev convenience: load the Demo@1234 accounts + sample data.
+      SEED_DEMO_DATA: "true"
     ports:
       - "8000:8000"
     depends_on:
@@ -31,6 +33,7 @@ services:
         condition: service_healthy
     command: >
       sh -c "alembic upgrade head &&
+             python -m app.bootstrap &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - ./backend:/app
@@ -38,6 +41,7 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     env_file:
       - ./frontend/.env

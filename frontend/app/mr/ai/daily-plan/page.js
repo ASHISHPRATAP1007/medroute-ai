@@ -1,8 +1,12 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { CalendarPlus, Sparkles } from "lucide-react";
+import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
+import { planVisit } from "@/services/visit-service";
+import { localISODate } from "@/lib/dates";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, EmptyState, ErrorState, SkeletonRows } from "@/components/ui/Feedback";
 import { getDailyPlan } from "@/services/ai-service";
@@ -15,6 +19,18 @@ function ScoreBadge({ score }) {
 export default function MRDailyPlanPage() {
   const { data, isLoading, isError } = useQuery({ queryKey: ["daily-plan"], queryFn: () => getDailyPlan(20) });
   const items = data?.data || [];
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
+
+  const addMutation = useMutation({
+    mutationFn: (doctor) => planVisit(doctor.id, localISODate()),
+    onSuccess: (_, doctor) => {
+      showToast(`${doctor.full_name} added to today's visit plan.`, "success");
+      queryClient.invalidateQueries({ queryKey: ["my-visits"] });
+      queryClient.invalidateQueries({ queryKey: ["daily-route"] });
+    },
+    onError: (err) => showToast(err.message || "Could not add to visit plan.", "error"),
+  });
 
   return (
     <div>
@@ -43,7 +59,17 @@ export default function MRDailyPlanPage() {
                 </Link>
                 <p className="text-sm text-slate-500">{[item.doctor.area, item.doctor.city].filter(Boolean).join(", ")}</p>
               </div>
-              <ScoreBadge score={item.score} />
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <ScoreBadge score={item.score} />
+                <Button
+                  variant="secondary"
+                  className="!px-2.5 !py-1 text-xs"
+                  disabled={addMutation.isPending && addMutation.variables?.id === item.doctor.id}
+                  onClick={() => addMutation.mutate(item.doctor)}
+                >
+                  <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" /> Add to today
+                </Button>
+              </div>
             </div>
             <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
               {item.reasons.map((reason, i) => (
