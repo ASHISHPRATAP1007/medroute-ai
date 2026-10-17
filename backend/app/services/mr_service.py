@@ -77,13 +77,20 @@ async def _transition_status(
     return mr
 
 
-async def approve_mr(db: AsyncSession, mr_id: uuid.UUID, admin_id: uuid.UUID) -> User:
+async def approve_mr(db: AsyncSession, mr_id: uuid.UUID, admin_id: uuid.UUID) -> tuple[User, str | None]:
+    """Approve, and auto-assign a territory from the MR's registered city/area.
+    Returns (mr, name of the auto-assigned territory or None)."""
+    from app.services.territory_service import auto_assign_from_profile
+
     mr = await get_mr(db, mr_id)
     if mr.status == UserStatus.APPROVED:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MR is already approved.")
-    return await _transition_status(
+    territory = await auto_assign_from_profile(db, mr, admin_id)
+    territory_name = territory.name if territory else None
+    mr = await _transition_status(
         db, mr, UserStatus.APPROVED, AuditAction.MR_APPROVED, admin_id, f"MR {mr.email} approved."
     )
+    return mr, territory_name
 
 
 async def reject_mr(db: AsyncSession, mr_id: uuid.UUID, admin_id: uuid.UUID) -> User:

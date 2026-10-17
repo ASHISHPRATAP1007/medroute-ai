@@ -45,8 +45,19 @@ async def get_mr(mr_id: uuid.UUID, db: AsyncSession = Depends(get_db), _admin: U
 
 @router.post("/{mr_id}/approve", response_model=ApiResponse[MRListItem])
 async def approve_mr(mr_id: uuid.UUID, db: AsyncSession = Depends(get_db), admin: User = Depends(require_admin)):
-    mr = await mr_service.approve_mr(db, mr_id, admin.id)
-    return ApiResponse(message="MR approved.", data=MRListItem.model_validate(mr))
+    mr, territory_name = await mr_service.approve_mr(db, mr_id, admin.id)
+    message = (
+        f"MR approved and assigned to '{territory_name}'." if territory_name
+        else "MR approved. Assign a territory so they can see doctors."
+        if not await _has_territory(db, mr.id) else "MR approved."
+    )
+    return ApiResponse(message=message, data=MRListItem.model_validate(mr))
+
+
+async def _has_territory(db: AsyncSession, mr_id: uuid.UUID) -> bool:
+    from sqlalchemy import select
+    from app.models.territory_mr import TerritoryMR
+    return (await db.execute(select(TerritoryMR.id).where(TerritoryMR.mr_id == mr_id).limit(1))).scalar_one_or_none() is not None
 
 
 @router.post("/{mr_id}/reject", response_model=ApiResponse[MRListItem])
